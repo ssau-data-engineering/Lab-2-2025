@@ -1,0 +1,29 @@
+services:
+  n8n:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+    volumes:
+      - ./temp:/temp
+    networks:
+      - n8n_network
+
+  auto-subtitle-api:
+    build: ./auto-subtitle-api
+    ports:
+      - "5000:5000"
+    networks:
+      - n8n_network
+
+
+volumes:
+  n8n_data:
+  
+
+networks:
+  n8n_network:
+    driver: bridge

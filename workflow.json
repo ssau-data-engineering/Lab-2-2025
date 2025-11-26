@@ -1,0 +1,594 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot8526624680:AAHLFW9hdjlUwkbBIvdMnjOfV0bO2UmWr1w/getUpdates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeout",
+              "value": "20"
+            },
+            {
+              "name": "allowed_updates",
+              "value": "'[\"message\"]'"
+            },
+            {
+              "name": "offset",
+              "value": "={{ $json.data[0].offset + 1 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1568,
+        192
+      ],
+      "id": "533ddb05-168f-4798-a88e-a3a0f14b07f9",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1792,
+        192
+      ],
+      "id": "5ec1dd27-7452-44da-989f-ad70a66812fb",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "result",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        192
+      ],
+      "id": "5ef13c80-6c52-4302-bdf7-2b960e652054",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.video.mime_type == 'video/mp4'}}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "6b951706-0dd8-495b-a8eb-9aed385b5e66"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "видео"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b6fd54fe-965d-4678-8b20-e8f888342569",
+                    "leftValue": "={{ $json.message.text.trim().match(/^https:\\/\\/.*\\.mp4$/i) !== null }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "mp4 ссылка"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -896,
+        176
+      ],
+      "id": "ba7d3e29-e56b-4ec3-9c16-7e9a44e7852f",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.video.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        96
+      ],
+      "id": "bc86f765-5d82-406e-a505-231648354eab",
+      "name": "Get a file",
+      "webhookId": "e0769871-efe3-49da-81a5-2f88a6fdd33f",
+      "credentials": {
+        "telegramApi": {
+          "id": "5ppxCEjGKuYdaRZf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/temp/input-video.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        192
+      ],
+      "id": "5ade9ef7-fec8-4293-9294-db2e0cd9722c",
+      "name": "Read/Write Files from Disk2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.message.text }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -672,
+        288
+      ],
+      "id": "4badc055-ad65-4415-a612-876dd4bfc3ca",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -y -i \"/temp/input-video.mp4\" -vn -acodec pcm_s16le -ar 44100 -ac 2 /temp/audio.wav"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        192
+      ],
+      "id": "2162172c-8e5c-4a77-bb7b-8548396cb673",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5000/transcribe",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ],
+      "id": "a16243ce-7bcf-4862-8775-1a68bdfd160f",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/temp/audio.wav",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "id": "1f26b524-20dc-4119-af16-80cf19a78c71",
+      "name": "Read/Write Files from Disk3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты — профессиональный переводчик субтитров. Твоя задача — перевести предоставленные субтитры с любого языка на русский язык, строго сохранив формат SRT.\n\nПравила:\n\nНе изменяй номера строк и временные метки (формат: ЧЧ:ММ:СС,мс --> ЧЧ:ММ:СС,мс).\nПереводи только текст каждой реплики.\nСохраняй оригинальную структуру: пустые строки между блоками, порядок следования.\nПеревод должен быть естественным, разговорным, но точным по смыслу.\nЕсли в оригинале несколько строк в одном блоке — сохрани их как есть (переведи каждую строку, разделив переносом).\nНе добавляй пояснений, комментариев, заголовков или лишнего текста вне SRT-формата.\nНа выходе должен быть только чистый SRT-контент, готовый к сохранению в файл с расширением .srt.\nВот входные субтитры:\n\n{{ $json.data }}\n\nТеперь выведи переведённые субтитры на русском языке в точном соответствии с форматом SRT.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        448,
+        192
+      ],
+      "id": "6fedd989-90cb-4fe4-8d5e-f1241a635d87",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/temp/out_ru.srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        192
+      ],
+      "id": "d09837d9-2224-4e41-af4c-16d2b905df0c",
+      "name": "Read/Write Files from Disk4"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "text",
+        "options": {
+          "fileName": "out_ru.srt"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        192
+      ],
+      "id": "a62475c4-9438-47f6-8413-5b6160e6c198",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y \\\n  -i \"/temp/input-video.mp4\" \\\n  -vf \"subtitles=/temp/out_ru.srt:force_style='Fontsize=22,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H80000000&,Bold=1'\" \\\n  -c:a copy \\\n  \"/temp/output_ru.mp4\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        192
+      ],
+      "id": "49334335-9b56-40cc-ae2e-c356080165db",
+      "name": "Execute Command1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/temp/output_ru.mp4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        192
+      ],
+      "id": "b2b7c3a0-c3bc-4e42-ba7a-0b1b77e0c110",
+      "name": "Read/Write Files from Disk5"
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "1080893441",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "Here is yout video!"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        192
+      ],
+      "id": "090c903a-1be1-449e-b6b9-a72af61a3aea",
+      "name": "Send a video",
+      "webhookId": "f868d2f3-ed47-4e0f-82b1-44bf564b89fc",
+      "credentials": {
+        "telegramApi": {
+          "id": "5ppxCEjGKuYdaRZf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items[items.length - 1];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        192
+      ],
+      "id": "ddbadc92-eacd-4551-a81b-95f7166df0b0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        400,
+        384
+      ],
+      "id": "8f050684-1a3d-43fc-91de-a5b2ccda7808",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "K77oLCrdPrGiGNdJ",
+          "name": "Mistral Cloud account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk2": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk4": {
+      "main": [
+        [
+          {
+            "node": "Execute Command1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk5": {
+      "main": [
+        [
+          {
+            "node": "Send a video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a video": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "82c8e121-9f45-4ed1-93d5-c4bb865ceff4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b722290c399538437a7bd0ec5ba95f393f8591bc64f24ebc7fef6515d7a70032"
+  },
+  "id": "XgjOLvtmcUmp5LCe",
+  "tags": []
+}
