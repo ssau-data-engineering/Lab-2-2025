@@ -1,0 +1,30 @@
+services:
+  n8n:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password
+    volumes:
+      - n8n:/home/node/.n8n
+    networks:
+      - n8n_network
+
+  auto-subtitle-api:
+    build: ./auto-subtitle-api
+    ports:
+      - "8000:8000"
+    environment:
+      - WHISPER_MODEL=base
+    networks:
+      - n8n_network
+
+networks:
+  n8n_network:
+
+volumes:
+  n8n:
