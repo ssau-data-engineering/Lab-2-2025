@@ -1,0 +1,148 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "// Генерируем 7 дат, начиная с завтрашнего дня (D+1)\nconst today = new Date();\nconst dates = [];\nconst city = \"Samara\"; // Город для прогноза\n\nfor (let i = 1; i <= 7; i++) {\n  const futureDate = new Date(today);\n  futureDate.setDate(today.getDate() + i);\n\n  // Форматируем в YYYY-MM-DD\n  const year = futureDate.getFullYear();\n  const month = String(futureDate.getMonth() + 1).padStart(2, '0');\n  const day = String(futureDate.getDate()).padStart(2, '0');\n\n  dates.push(`${year}-${month}-${day}`);\n}\n\n// Возвращаем структуру, готовую для отправки в HTTP Request\nreturn [{ json: { city: city, dates: dates } }];"
+      },
+      "name": "Code: Generate 7 Dates",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "870324c2-5071-4f73-9f8e-900ae7dbbe80"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/predict",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"city\": \"{{ $json.city }}\",\n  \"dates\": [\"{{ $json.dates[0] }}\", \"{{ $json.dates[1] }}\", \"{{ $json.dates[2] }}\", \"{{ $json.dates[3] }}\", \"{{ $json.dates[4] }}\", \"{{ $json.dates[5] }}\", \"{{ $json.dates[6] }}\"]\n} ",
+        "options": {}
+      },
+      "name": "HTTP Request: Call Inference Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "46052277-f12c-484f-9d93-565d4091d6ae"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Получаем ответ от узла HTTP Request\nconst apiResponse = $input.item.json.json;\n\n// Получаем входные данные (даты) от узла Code (он был на входе перед HTTP-запросом)\nconst dates = $input.item.json.dates;\n\nconst city = apiResponse.city;\nconst predictions = apiResponse.predictions;\nconst intervals = apiResponse.confidence_intervals;\n\nlet forecastText = \"\";\n\n// Создаем строки для каждого дня\nfor (let i = 0; i < dates.length; i++) {\n    // Форматируем дату в MM.DD\n    const date = dates[i].slice(5).replace('-', '.'); \n    const temp = predictions[i];\n    const sign = temp >= 0 ? '+' : ''; \n    const lower = intervals[i].lower;\n    const upper = intervals[i].upper;\n\n    forecastText += `*${date}*: ${sign}${temp}°C (Доверие: ${lower}°C - ${upper}°C)\\n`;\n}\n\n// Собираем финальное сообщение в Markdown для Telegram\nconst telegramMessage = \n    `☀️ *Еженедельный Прогноз Погоды* ☀️\\n\\n` +\n    `🏙️ *Город:* ${city}\\n\\n` + // Используем имя города из ответа API\n    `📅 *Прогноз на 7 дней:*\\n\\n` +\n    forecastText +\n    `\\n---\\n` +\n    `🛠️ *Источник:* Weather Forecast API`; \n\n// Передаем финальное сообщение\nreturn [{ json: { telegramMessage: telegramMessage } }];"
+      },
+      "name": "Function: Format Telegram Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "b5867b4a-b4a7-45fc-a273-5a3eabfbe229"
+    },
+    {
+      "parameters": {
+        "chatId": "",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {}
+      },
+      "name": "Telegram: Send Forecast",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "id": "ad6898dd-6a37-4ca0-a978-5a11e16adaee",
+      "webhookId": "24c2b830-e2e6-4db3-858f-c97a76ac9c3f",
+      "credentials": {
+        "telegramApi": {
+          "id": "yGcuR2bkhUvu4LFS",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "64519c9f-e998-46d6-912a-1edff402e94c",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code: Generate 7 Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Generate 7 Dates": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Call Inference Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Call Inference Service": {
+      "main": [
+        [
+          {
+            "node": "Function: Format Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function: Format Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "acd1c720-a162-4599-9bd6-4120b86f26ea",
+  "meta": {
+    "instanceId": "c395de0e31e4197348a2766c945d627f33ce828fdf90925884acbc69a15f721c"
+  },
+  "id": "M8jiIpkNxk1SEAx6",
+  "tags": []
+}
