@@ -1,0 +1,664 @@
+{
+  "name": "Video Subtitle Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "edited_message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "a6d48cf0-b3ea-4c2c-b33e-7e47b7ea4b1e",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        320
+      ],
+      "webhookId": "61161219-d350-47e9-be41-e772948295c6",
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "286df28e-5078092097799-a483ab41affe",
+      "name": "Send Hello Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        192
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "file-condition",
+                    "leftValue": "={{ $json.message.video }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "file"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "link-condition",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "http",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "link"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c651ceb0-9184-486f-9d63-9516ea2764a5",
+      "name": "Check Input Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -1408,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.video.file_id }}",
+        "additionalFields": {
+          "mimeType": "video/mp4"
+        }
+      },
+      "id": "170e2ce7-0d09-4780-9a7f-5a0713e6289b",
+      "name": "Get Telegram File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1184,
+        224
+      ],
+      "webhookId": "27b0aec2-41d7-4c8e-bef3-bb9dd90dd67d",
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.message.text }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "b4bbfb6a-44b9-49ee-9261-88f5231ebfc6",
+      "name": "Download Video URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1184,
+        464
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f3f44099-dc37-42e5-9601-92c276971cdb",
+      "name": "Send Processing Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-processing:8100/extract-audio",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "video_file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio_file"
+            }
+          }
+        }
+      },
+      "name": "Extract Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -960,
+        336
+      ],
+      "id": "593a5675-4bbe-4a23-8ac7-85a48e89bda2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://auto-subtitle-api:9000/asr",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "audio_file",
+              "inputDataFieldName": "audio_file"
+            },
+            {
+              "name": "task",
+              "value": "transcribe"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "output",
+              "value": "srt"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "srt_file"
+            }
+          }
+        }
+      },
+      "id": "17ace707-5aa4-4631-a588-552ce90e825e",
+      "name": "Extract Audio & Generate SRT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -752,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-processing:8100/burn-subtitles",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "srt_file",
+              "inputDataFieldName": "ru_srt_file"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video_file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "result_video_file"
+            }
+          }
+        }
+      },
+      "id": "182eb13c-d3ad-4608-a141-d47c92ce52b2",
+      "name": "Burn Subtitles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "669a02ec-6e5f-412c-abc4-26313f53fa0f",
+      "name": "Send Ready Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        592,
+        208
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ 593390842 }}",
+        "binaryData": true,
+        "binaryPropertyName": "result_video_file",
+        "additionalFields": {
+          "caption": "✅ Видео обработано! Добавлены русские субтитры."
+        }
+      },
+      "id": "ea6829e3-7767-4304-b25d-891b37dd2283",
+      "name": "Send Result Video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        320
+      ],
+      "webhookId": "da4007e2-64bf-4345-b6b4-deaf51e00920",
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "dfa84fc6-c3fb-41c1-a966-abfd9403d377",
+      "name": "Send Goodbye Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        992,
+        144
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://video-processing:8100/clear",
+        "options": {}
+      },
+      "id": "6d606606-be22-4dac-962c-cf09bc8a5656",
+      "name": "Cleanup Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1008,
+        320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "41bc370e-e882-4083-ac99-c2a3ea70aab4",
+      "name": "Send Download Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        672
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "3b8b441f-deab-41d9-a32d-193152174e09",
+      "name": "Send Server Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        688,
+        496
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "0XXiTRnZ7pszCjcF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "srt_file",
+        "destinationKey": "srt_file",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        176
+      ],
+      "id": "a7d9bc49-5163-4af0-a53d-439d924ba44e",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mistralCloudApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.MISTRAL_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "mistral-small-latest"
+            },
+            {
+              "name": "messages",
+              "value": "={{\n[\n  {\n    \"role\": \"system\",\n    \"content\": \"Ты профессиональный переводчик с английского на русский. Твоя задача - переводить английские субтитры (SRT формат) на русский язык. Получай весь текст SRT файла и возвращай полный перевод на русском в том же SRT формате. Сохраняй структуру: номер субтитров, временные метки, и переведенный текст. Не добавляй пояснений, только перевод.\"\n  },\n  {\n    \"role\": \"user\",\n    \"content\": \"Переведи эти английские субтитры на русский язык:\\n\\n\" + $json.srt_file\n  }\n] \n}}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{ 0.1 }}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ 4000 }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "3dbfe482-b5ae-4f50-8e80-e5626613204b",
+      "name": "Translate via Mistral AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -320,
+        176
+      ],
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "REE4cDmKNPjKkZjb",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "choices[0].message.content",
+        "binaryPropertyName": "ru_srt_file",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        176
+      ],
+      "id": "d5e00fa1-4fee-4539-8b07-1ed71696a2a6",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        192,
+        320
+      ],
+      "id": "0c84ed58-ca92-4859-b282-a2a58f0f387f",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Check Input Type": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Video URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram File": {
+      "main": [
+        [
+          {
+            "node": "Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video URL": {
+      "main": [
+        [
+          {
+            "node": "Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Burn Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Send Result Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Input Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Audio": {
+      "main": [
+        [
+          {
+            "node": "Extract Audio & Generate SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Audio & Generate SRT": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Translate via Mistral AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translate via Mistral AI": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Burn Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Result Video": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c647bfbd-6515-4e2d-be22-a8a5bb4cccb7",
+  "meta": {
+    "instanceId": "a2f9f425b14ce94b6da5aa04a909ade50c69eac79b35aca1f68b2bfcb5ec4ebc"
+  },
+  "id": "w1pfReV6JH5CpeYW",
+  "tags": []
+}

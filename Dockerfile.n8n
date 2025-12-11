@@ -1,0 +1,55 @@
+FROM n8nio/n8n:latest
+
+# Устанавливаем Python и системные зависимости для Alpine
+USER root
+
+# Для Alpine используем apk вместо apt-get
+RUN apk update && apk add --no-cache \
+    python3 \
+    py3-pip \
+    python3-dev \
+    ffmpeg \
+    git \
+    curl \
+    wget \
+    gcc \
+    musl-dev \
+    linux-headers \
+    && rm -rf /var/cache/apk/*
+
+# Создаем рабочую директорию для скриптов
+WORKDIR /scripts
+
+# Копируем requirements и устанавливаем зависимости Python с флагом break-system-packages
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --upgrade pip --break-system-packages && \
+    pip3 install --no-cache-dir -r requirements.txt --break-system-packages
+
+# Копируем все Python скрипты
+COPY scripts/*.py .
+
+# Создаем символическую ссылку python3 -> python
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+# Создаем директорию для временных файлов
+RUN mkdir -p /tmp/video_processing && chmod 777 /tmp/video_processing
+
+# Устанавливаем yt-dlp (для загрузки видео с YouTube)
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+
+RUN apk add --no-cache curl
+
+# Возвращаемся к пользователю n8n
+USER node
+
+# Устанавливаем рабочую директорию обратно
+WORKDIR /home/node/.n8n
+
+# Устанавливаем переменные окружения для Python
+ENV PYTHONPATH=/scripts
+ENV PATH="/usr/local/bin:/usr/bin:${PATH}"
+
+# Экспортируем порт
+EXPOSE 5678
+
+CMD ["n8n", "start"]

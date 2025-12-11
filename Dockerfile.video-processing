@@ -1,0 +1,40 @@
+FROM python:3.11-slim
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    git \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем requirements.txt
+COPY requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Устанавливаем дополнительные пакеты
+RUN pip install fastapi==0.104.1 uvicorn==0.24.0 python-multipart==0.0.6
+
+# Создаем директорию для скриптов
+RUN mkdir -p /app/scripts
+
+# Копируем все Python скрипты
+COPY scripts/*.py /app/scripts/
+
+# Создаем директорию для временных файлов
+RUN mkdir -p /tmp/video_processing && chmod 777 /tmp/video_processing
+
+# Создаем символическую ссылку для импорта
+RUN ln -s /app/scripts/video_processor.py /app/video_processor.py
+
+# Открываем порт
+EXPOSE 8100
+
+# Запускаем сервер
+CMD ["uvicorn", "scripts.video_processor:app", "--host", "0.0.0.0", "--port", "8100", "--reload"]

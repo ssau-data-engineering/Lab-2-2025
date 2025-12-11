@@ -1,0 +1,96 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-lab2
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password123
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_EDITOR_BASE_URL=http://localhost:5678
+      - WEBHOOK_URL=https://heartfelt-listlessly-claude.ngrok-free.dev
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_TELEMETRY_ENABLED=false
+      - POSTHOG_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/home/node/.n8n/workflows
+      - ./scripts:/scripts
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - n8n_network
+
+  auto-subtitle-api:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper-api
+    ports:
+      - "9000:9000"
+    environment:
+      - ASR_MODEL=base
+      - ASR_ENGINE=openai_whisper
+    volumes:
+      - whisper_cache:/root/.cache/whisper
+    networks:
+      - n8n_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  video-processing:
+    build:
+      context: .
+      dockerfile: Dockerfile.video-processing
+    container_name: video-processing
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./scripts:/scripts
+      - /tmp/video_processing:/tmp/video_processing
+    networks:
+      - n8n_network
+
+  # vllm-server:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: vllm-server
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - MODEL=Qwen/Qwen2.5-0.5B-Instruct
+  #     - DEVICE=cpu
+  #     - MAX_MODEL_LEN=2048
+  #     - MAX_NUM_SEQS=8
+  #   volumes:
+  #     - huggingface_cache:/root/.cache/huggingface
+  #   command: >
+  #     --model Qwen/Qwen2.5-0.5B-Instruct
+  #     --host 0.0.0.0
+  #     --port 8000
+  #     --served-model-name qwen
+  #     --trust-remote-code
+  #     --dtype auto
+  #     --max-model-len 2048
+  #     --max-num-seqs 8
+  #     --device cpu
+  #   networks:
+  #     - n8n_network
+  #   shm_size: '4gb'
+  #   restart: unless-stopped
+
+networks:
+  n8n_network:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  whisper_cache:
+  huggingface_cache:
