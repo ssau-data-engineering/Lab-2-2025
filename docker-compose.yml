@@ -1,0 +1,51 @@
+services:
+  n8n:
+    build: .
+    restart: unless-stopped
+    user: root
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WH=${URL} 
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./tmp:/tmp
+      - ./scripts:/scripts
+    networks:
+      - n8n_network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_cpu 
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama  # Локальная папка для данных
+    environment:
+      - OLLAMA_NUM_PARALLEL=1  # Ограничиваем параллельные запросы для CPU
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - n8n_network
+
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu 
+    container_name: whisper
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - WHISPER_MODEL=tiny # Модель поменьше для тестов
+    volumes:
+      - ./whisper_cache:/root/.cache/huggingface
+    networks:
+      - n8n_network
+
+networks:
+  n8n_network:
+    driver: bridge
