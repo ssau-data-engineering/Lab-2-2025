@@ -1,0 +1,80 @@
+services:
+  n8n:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.n8n
+    container_name: n8n_lab2
+    env_file:
+      - .env
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - EXECUTION_DATA_DIR=/data
+      - VLLM_URL=${VLLM_URL}
+      - TG_TOKEN=${TG_TOKEN}
+      - WEBHOOK_URL=https://0d68acb36db2.ngrok-free.app
+      - N8N_PAYLOAD_SIZE_MAX=128
+    volumes:
+      - ../data:/data
+    depends_on:
+      - vllm
+      - stt_service
+    restart: unless-stopped
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm_lab2
+    entrypoint: ["vllm"]
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: [
+        "serve",
+        "--model", "Qwen/Qwen2.5-0.5B-Instruct-AWQ",
+        "--host", "0.0.0.0",
+        "--port", "8000",
+        "--dtype", "float16",
+        "--max-model-len", "4096",
+        "--gpu-memory-utilization", "0.8",
+        "--quantization", "awq",
+        "--enforce-eager"
+      ]
+  minio:
+    image: minio/minio:latest
+    container_name: minio_lab2
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio12345
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio_data:/data
+    networks:
+      - default
+
+  stt_service:
+    build:
+      context: ../stt_service
+      dockerfile: Dockerfile
+    container_name: stt_service
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+volumes:
+  minio_data:

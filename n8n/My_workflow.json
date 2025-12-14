@@ -1,0 +1,949 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": false
+        }
+      },
+      "id": "db3d70cf-f24c-4dd1-900a-8de339985165",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1720,
+        620
+      ],
+      "webhookId": "34d3e98f-9f25-432e-a731-8589d0649c83",
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message;\n\nlet fileId = null;\nlet fileName = null;\n\nif (msg?.video?.file_id) {\n  fileId = msg.video.file_id;\n  fileName = msg.video.file_name || 'video.mp4';\n} else if (msg?.document?.file_id) {\n  fileId = msg.document.file_id;\n  fileName = msg.document.file_name || 'file.bin';\n} else {\n  // чтобы понять что пришло — покажем ключи\n  throw new Error('Нет video/document. Доступные поля message: ' + Object.keys(msg || {}).join(', '));\n}\n\nreturn [{ json: { fileId, fileName, chatId: msg.chat.id } }];\n"
+      },
+      "id": "592f46ee-5707-461c-b92d-64499f6d111a",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1300,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "d4cb9d97-77aa-4783-9778-824351794bcb",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        600
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $node[\"Telegram Trigger\"].json.message.video.file_size }}",
+              "value2": 20000000
+            }
+          ]
+        }
+      },
+      "id": "6b9dd0fa-19d7-4830-9864-cfe62b3be9cd",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1080,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"Telegram Trigger\"].json.message.chat.id }}",
+        "text": "Видео слишком большое (более 20 МБ)  Telegram не позволяет ботам скачивать такие файлы. Пожалуйста:\n • пришли ссылку (YouTube / Drive)\n • или более короткое видео",
+        "additionalFields": {}
+      },
+      "id": "d20193f5-9d8f-459c-b185-e088645d9094",
+      "name": "Telegram1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        780
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/tmp/in.mp4",
+        "options": {}
+      },
+      "id": "5fc1e491-6066-4cd7-ac12-9b82789d578d",
+      "name": "Write Binary File",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y -i /home/node/tmp/in.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le /home/node/tmp/audio.wav"
+      },
+      "id": "6de06282-65c9-4bcd-87db-646282969733",
+      "name": "Execute Command",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "number": [
+            {
+              "name": "chat_id",
+              "value": "={{ $node[\"Telegram Trigger\"].json.message.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a244c3a-386d-47f5-a3ac-c03f0bf33447",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/tmp/audio.wav"
+      },
+      "id": "5a310a79-2a5a-4161-9c0f-24a340050f05",
+      "name": "Read Binary Files",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        20,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://stt_service:8001/stt",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "small"
+            },
+            {
+              "name": "lang",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a568b6af-f8a5-46e3-9a91-e312ed8d7ed0",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        240,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cat > /home/node/tmp/subs_en.srt <<'SRT'\n{{$json}}\nSRT"
+      },
+      "id": "56515215-c75b-462f-a786-471055981472",
+      "name": "Execute Command1",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        460,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const srt = $input.first().json;\nconst srtText = typeof srt === 'string' ? srt : (srt.data || srt.body || srt.text || '');\n\nif (!srtText || !srtText.includes('-->')) {\n  throw new Error('SRT не похож на SRT. Проверь Response Format в STT HTTP Request.');\n}\n\nconst blocks = srtText.trim().split(/\\n\\s*\\n/);\nconst segments = [];\n\nfor (const b of blocks) {\n  const lines = b.split('\\n').map(l => l.trim()).filter(Boolean);\n  if (lines.length < 3) continue;\n\n  const idx = lines[0];\n  const time = lines[1];\n  const text = lines.slice(2).join('\\n');\n\n  segments.push({ idx, time, text });\n}\n\nreturn [{ json: { segments, srtText } }];\n"
+      },
+      "id": "014e7430-1d87-4c8c-90c6-6f8ba2309a50",
+      "name": "Code1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vllm_lab2:8000/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}\n",
+        "options": {}
+      },
+      "id": "83420289-f6f9-4c23-9d7e-4c93bf012b6d",
+      "name": "HTTP Request1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const srt = $input.first().json.srtText;\n\nreturn [{\n  json: {\n    model: \"Qwen/Qwen2.5-0.5B-Instruct-AWQ\",\n    temperature: 0,\n    messages: [\n      {\n        role: \"user\",\n        content:\n          \"Переведи субтитры EN --> RU. Сохраняй переносы строк внутри блока. Не меняй таймкоды и номера.\\n\\n\" +\n          srt\n      }\n    ]\n  }\n}];\n"
+      },
+      "id": "64ce67da-3fed-41d2-9ef1-01e15f9aff19",
+      "name": "Code2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($input.first().json.choices?.[0]?.message?.content ?? \"\").replace(/\\r\\n/g, \"\\n\");\n\nconst re = /(^\\d+\\n\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3}\\n(?:.*(?:\\n|$))+?)(?=\\n{2,}\\d+\\n|\\n*$)/gm;\n\nconst blocks = [];\nlet m;\nwhile ((m = re.exec(raw)) !== null) {\n  const block = m[1].split(\"\\n\").map(l => l.trimEnd()).join(\"\\n\").trim();\n  blocks.push(block);\n}\n\nif (!blocks.length) {\n  throw new Error(\"Не найдено ни одного SRT-блока в ответе модели\");\n}\n\nconst srt_ru = blocks.join(\"\\n\\n\") + \"\\n\";\n\nreturn [{ json: { srt_ru } }];\n"
+      },
+      "id": "bd791c50-1bec-4ee2-8f22-95e3265ffbb7",
+      "name": "Code3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y \\\n  -i /home/node/tmp/in.mp4 \\\n  -vf \"subtitles=/home/node/tmp/subs_ru.srt:charenc=UTF-8\" \\\n  -c:a copy \\\n  /home/node/tmp/out.mp4\n"
+      },
+      "id": "9659b847-5375-45fa-9057-d41f262eb4ee",
+      "name": "Execute Command2",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cat > /home/node/tmp/subs_ru.srt <<'SRT'\n{{$json.srt_ru}}\nSRT"
+      },
+      "id": "ce5e1f42-788e-43ff-8ffe-07aed6c3e95a",
+      "name": "Execute Command3",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/tmp/out.mp4"
+      },
+      "id": "0373be5a-0e71-403a-8de1-d1d0997b9bde",
+      "name": "Read Binary Files1",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $node[\"Telegram Trigger\"].json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "id": "fa259e09-cc41-4f47-ba7b-3607fb6b4b13",
+      "name": "Telegram2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1900,
+        460
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.video.file_name }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "abba82ef-43b8-4633-ad4c-3f8d7d4b8fad",
+      "name": "IF1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1500,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.text }}",
+              "operation": "startsWith",
+              "value2": "http"
+            }
+          ]
+        }
+      },
+      "id": "d7ab0a7a-4aff-4de4-acc0-02ec4ca6ce59",
+      "name": "IF2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1320,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.message.text }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "13fdc199-5680-4038-994f-073d94f0222e",
+      "name": "HTTP Request2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -1100,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/tmp/in.mp4",
+        "options": {}
+      },
+      "id": "59ce3515-cc0a-4fde-90d4-6716dc8dee81",
+      "name": "Write Binary File1",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -920,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y -i /home/node/tmp/in.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le /home/node/tmp/audio.wav"
+      },
+      "id": "95c60a5e-56ba-4202-afba-a76d458cee0c",
+      "name": "Execute Command4",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/tmp/audio.wav"
+      },
+      "id": "d3782efd-88f3-4567-94a2-e0b384a15933",
+      "name": "Read Binary Files2",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://stt_service:8001/stt",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "small"
+            },
+            {
+              "name": "lang",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f25afb2d-7819-4189-b9c5-b90203ff69e4",
+      "name": "HTTP Request3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -60,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const srt = $input.first().json;\nconst srtText = typeof srt === 'string' ? srt : (srt.data || srt.body || srt.text || '');\n\nif (!srtText || !srtText.includes('-->')) {\n  throw new Error('SRT не похож на SRT. Проверь Response Format в STT HTTP Request.');\n}\n\nconst blocks = srtText.trim().split(/\\n\\s*\\n/);\nconst segments = [];\n\nfor (const b of blocks) {\n  const lines = b.split('\\n').map(l => l.trim()).filter(Boolean);\n  if (lines.length < 3) continue;\n\n  const idx = lines[0];\n  const time = lines[1];\n  const text = lines.slice(2).join('\\n');\n\n  segments.push({ idx, time, text });\n}\n\nreturn [{ json: { segments, srtText } }];\n"
+      },
+      "id": "105c27a6-4708-426f-b74e-473f57062517",
+      "name": "Code4",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        100,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vllm_lab2:8000/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}\n",
+        "options": {}
+      },
+      "id": "503214ea-3bd5-4eff-b189-4b17849e1399",
+      "name": "HTTP Request4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        560,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const srt = $input.first().json.srtText;\n\nreturn [{\n  json: {\n    model: \"Qwen/Qwen2.5-0.5B-Instruct-AWQ\",\n    temperature: 0,\n    messages: [\n      {\n        role: \"user\",\n        content:\n          \"Переведи субтитры EN --> RU. Сохраняй переносы строк внутри блока. Не меняй таймкоды и номера.\\n\\n\" +\n          srt\n      }\n    ]\n  }\n}];\n"
+      },
+      "id": "a9e6a712-c588-4dea-8ec8-6f2370660858",
+      "name": "Code5",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        320,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = ($input.first().json.choices?.[0]?.message?.content ?? \"\").replace(/\\r\\n/g, \"\\n\");\n\n// 0) обрезаем всё до первого таймкода (убирает \"Конечно...\", пояснения и т.п.)\nconst tci = raw.search(/\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3}/);\nif (tci === -1) throw new Error(\"В ответе нет таймкодов SRT\");\nraw = raw.slice(Math.max(0, tci - 50)); // небольшой запас на номер\n\n// 1) чинит \"1. 00:00:...\" или \"1) 00:00...\" или \"1 00:00...\" -> \"1\\n00:00...\"\nraw = raw.replace(\n  /(^|\\n)\\s*(\\d+)\\s*[.)]?\\s*(\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3})/g,\n  \"$1$2\\n$3\"\n);\n\n// 2) гарантируем перенос строки после таймкода (если модель лепит текст в ту же строку)\nraw = raw.replace(\n  /(\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3})[ \\t]+/g,\n  \"$1\\n\"\n);\n\n// 3) нормализуем пустые строки (между блоками оставим 1 пустую)\nraw = raw.replace(/\\n{3,}/g, \"\\n\\n\").trim() + \"\\n\";\n\n// 4) теперь можно парсить блоки\nconst re =\n  /(^\\d+\\n\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3}\\n(?:.*(?:\\n|$))+?)(?=\\n{2,}\\d+\\n|\\n*$)/gm;\n\nconst blocks = [];\nlet m;\nwhile ((m = re.exec(raw)) !== null) {\n  const block = m[1].split(\"\\n\").map(l => l.trimEnd()).join(\"\\n\").trim();\n  blocks.push(block);\n}\n\nif (!blocks.length) {\n  // очень полезно видеть, что реально пришло после нормализации\n  throw new Error(\"Не найдено ни одного SRT-блока после нормализации. Tail:\\n\" + raw.slice(0, 800));\n}\n\nconst srt_ru = blocks.join(\"\\n\\n\") + \"\\n\";\nreturn [{ json: { srt_ru } }];\n"
+      },
+      "id": "fb9d8b9b-a5e7-4c34-97a6-845a1b08072c",
+      "name": "Code6",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        760,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y \\\n  -i /home/node/tmp/in.mp4 \\\n  -vf \"subtitles=/home/node/tmp/subs_ru.srt:charenc=UTF-8\" \\\n  -c:a copy \\\n  /home/node/tmp/out.mp4\n"
+      },
+      "id": "2bf5a496-0223-4d68-814a-75c010285139",
+      "name": "Execute Command6",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cat > /home/node/tmp/subs_ru.srt <<'SRT'\n{{$json.srt_ru}}\nSRT"
+      },
+      "id": "1d808f23-c719-4a04-ab66-d0b99505e913",
+      "name": "Execute Command7",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        980,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/tmp/out.mp4"
+      },
+      "id": "678edc80-5956-441b-a49f-5d24aed66a2c",
+      "name": "Read Binary Files4",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $node[\"Telegram Trigger\"].json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "id": "6436f821-c334-419e-83d0-26d5aa5bca14",
+      "name": "Telegram3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        960
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "IF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "main": [
+        [
+          {
+            "node": "Write Binary File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Binary File": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Read Binary Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Binary Files": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Execute Command1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "Execute Command3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command3": {
+      "main": [
+        [
+          {
+            "node": "Execute Command2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command2": {
+      "main": [
+        [
+          {
+            "node": "Read Binary Files1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Binary Files1": {
+      "main": [
+        [
+          {
+            "node": "Telegram2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Write Binary File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code4": {
+      "main": [
+        [
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        [
+          {
+            "node": "Code6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code6": {
+      "main": [
+        [
+          {
+            "node": "Execute Command7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command6": {
+      "main": [
+        [
+          {
+            "node": "Read Binary Files4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command7": {
+      "main": [
+        [
+          {
+            "node": "Execute Command6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Binary Files4": {
+      "main": [
+        [
+          {
+            "node": "Telegram3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Binary Files2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command4": {
+      "main": [
+        [
+          {
+            "node": "Read Binary Files2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Binary File1": {
+      "main": [
+        [
+          {
+            "node": "Execute Command4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "406491cc-afc1-453c-9341-d39ce4bcc6f1",
+  "id": "1",
+  "meta": {
+    "instanceId": "3520564feade67ccd05bd3862529b070a5fc747c2b474616d2b98ab025544b61"
+  },
+  "tags": []
+}

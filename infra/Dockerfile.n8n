@@ -1,0 +1,14 @@
+FROM n8nio/n8n:latest-debian
+
+USER root
+
+RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
+
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /home/node/tmp && \
+    mkdir /home/node/tmp/out && \
+    chmod 777 -R /home/node/tmp 
