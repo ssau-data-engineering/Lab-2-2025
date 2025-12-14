@@ -1,0 +1,7 @@
+fastapi==0.115.6
+uvicorn[standard]==0.30.6
+python-multipart==0.0.20
+requests==2.32.3
+srt==3.5.3
+transformers==4.46.3
+torch==2.5.1

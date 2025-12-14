@@ -1,0 +1,613 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Триггер').item.json.message.video }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "f8807f86-95d9-4dbe-8931-76a47ef4a8d7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "file"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3ab8be2d-1f4b-41d5-a93a-968464767ae4",
+                    "leftValue": "={{ $('Триггер').item.json.message.text }}",
+                    "rightValue": "https?:\\/\\/[^\\s]+",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "link"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "24ad1ed8-f70b-41ce-a176-9a4fe7df018f",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -368,
+        -64
+      ],
+      "id": "f2dda290-f4cb-4121-9045-6c8be86ea24f",
+      "name": "Триггер",
+      "webhookId": "73b04e0e-34d6-4da0-8170-29995f2227e8",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Обработка видео началась",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        -64
+      ],
+      "id": "7d1b626c-aadd-46b8-84a0-453318bddd92",
+      "name": "Приветственное сообщение",
+      "webhookId": "1bbc61c9-e4ce-4f6b-8b0b-90341a96882f",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/get_video",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        848,
+        -272
+      ],
+      "id": "ab84d428-c171-4410-bec0-062714825bd4",
+      "name": "Отправлен файл"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Триггер').item.json.message.text }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        544,
+        16
+      ],
+      "id": "79951ee2-5b39-404d-afdd-79c3f327f126",
+      "name": "Скачивание файла по ссылке",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-api:8000/extract-audio",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio_file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        928,
+        16
+      ],
+      "id": "81dc5534-120b-4468-a0e6-963285faab9c",
+      "name": "Извлечение аудио",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-api:8000/stt-whisper",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "audio_file"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "srt_file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1504,
+        -144
+      ],
+      "id": "faf7f6ce-b702-41fb-aac9-bd6bb7c4d8dc",
+      "name": "Создание субтитров",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "binaryData": true,
+        "binaryPropertyName": "result_video_file",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2720,
+        -208
+      ],
+      "id": "723e7735-7d59-480c-a9f8-5d7d995c934a",
+      "name": "Send a video",
+      "webhookId": "0ca538cb-7e8d-48d8-a049-ece1cf0aef7e",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-api:8000/translate-srt",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "srt_file"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "ru_srt_file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2048,
+        -176
+      ],
+      "id": "ff691281-40b6-4604-9398-e6e8f05915c6",
+      "name": "Перевод субтитров",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://video-api:8000/burn-subs",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "subs",
+              "inputDataFieldName": "ru_srt_file"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "result_video_file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2416,
+        -160
+      ],
+      "id": "6e45237d-1dab-48c3-a821-97d520167a7d",
+      "name": "Вставка в видео",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Не удалось скачать видео по ссылке",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        224
+      ],
+      "id": "3d852900-b9c3-4c52-a298-35ef7ac38662",
+      "name": "Ошибка скачивания видео",
+      "webhookId": "f99f8536-7e0f-4ba2-bc75-94ff37a8fd1c",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Не удалось извлечь аудио из видео",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        128
+      ],
+      "id": "9378d062-8b11-470c-b212-e8105434e378",
+      "name": "Ошибка извлечения аудио",
+      "webhookId": "20a2a18b-a7d3-4460-bb9f-1d97f101f203",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Ошибка создания субтитров",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        96
+      ],
+      "id": "163f15fd-4956-4125-af47-7c8cf82b63dd",
+      "name": "Ошибка создания субтитров",
+      "webhookId": "a5e8c0e2-eaef-43d8-8405-19d02decf0ec",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Ошибка перевода субтитров на русский язык",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2368,
+        112
+      ],
+      "id": "b5d013b6-971a-409c-8b0c-f9490841d891",
+      "name": "Ошибка перевода субтитров",
+      "webhookId": "a736ee30-6589-4f73-b99b-7d7def3b0412",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Ошибка вставки переведенных субтитров в видео",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2880,
+        96
+      ],
+      "id": "9b474efd-bd51-42b2-83fc-10244a881946",
+      "name": "Ошибка вставки переведенных субтитров в видео",
+      "webhookId": "ce494ec5-8e60-4a3b-8b47-6ccb0036c3e5",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Триггер').item.json.message.chat.id }}",
+        "text": "Видео с переведенными субтитрами",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3024,
+        -176
+      ],
+      "id": "170aaddb-f7a8-4695-a1a7-b90ce332a946",
+      "name": "Финальное сообщение",
+      "webhookId": "af92030d-9aed-43b3-b108-f56000aec37c",
+      "credentials": {
+        "telegramApi": {
+          "id": "IJMa7RZTBEmV8kzA",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Отправлен файл",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Скачивание файла по ссылке",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Триггер": {
+      "main": [
+        [
+          {
+            "node": "Приветственное сообщение",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Приветственное сообщение": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Отправлен файл": {
+      "main": [
+        []
+      ]
+    },
+    "Скачивание файла по ссылке": {
+      "main": [
+        [
+          {
+            "node": "Извлечение аудио",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка скачивания видео",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Извлечение аудио": {
+      "main": [
+        [
+          {
+            "node": "Создание субтитров",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка извлечения аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создание субтитров": {
+      "main": [
+        [
+          {
+            "node": "Перевод субтитров",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка создания субтитров",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Перевод субтитров": {
+      "main": [
+        [
+          {
+            "node": "Вставка в видео",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка перевода субтитров",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вставка в видео": {
+      "main": [
+        [
+          {
+            "node": "Send a video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка вставки переведенных субтитров в видео",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Финальное сообщение": {
+      "main": [
+        []
+      ]
+    },
+    "Send a video": {
+      "main": [
+        [
+          {
+            "node": "Финальное сообщение",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a7df0649-2295-499a-8812-7b3fac8b2af6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b8710cb6caa419556cf64e01c05ae5432e560c3077ac5c69310a313c2784e6b3"
+  },
+  "id": "ZglhfHK9fdjzr9or",
+  "tags": []
+}

@@ -1,0 +1,52 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - GENERIC_TIMEZONE=Europe/Helsinki
+      - TZ=Europe/Helsinki
+
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/data/workflows
+    networks:
+      - lab2_net
+    depends_on:
+      - video-api
+
+  video-api:
+    build:
+      context: ./app
+    container_name: video-api
+    restart: unless-stopped
+    environment:
+      - HF_API_KEY=${HF_API_KEY}
+      - HF_TR_MODEL_URL=${HF_TR_MODEL_URL}
+      - HF_TR_MODEL=${HF_TR_MODEL}
+      - WHISPER_MODEL=${WHISPER_MODEL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - video_outputs:/app/temp_outputs
+    networks:
+      - lab2_net
+
+volumes:
+  n8n_data:
+  video_outputs:
+
+networks:
+  lab2_net:
+    driver: bridge
