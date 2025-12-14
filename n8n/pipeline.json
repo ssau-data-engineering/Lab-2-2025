@@ -1,0 +1,479 @@
+{
+  "name": "Video Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "channel_post"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        480,
+        48
+      ],
+      "id": "5d291a17-1644-4c3e-a880-ffd593bbc924",
+      "webhookId": "4a93fb93-854d-484d-81b5-8fef9da85b68",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileName": "/files/input.mp4",
+        "options": {}
+      },
+      "name": "Write Input Video",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        656,
+        48
+      ],
+      "id": "9f18b36d-4044-4a0a-9c23-8c129744d17f"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "🎥 Video received. Starting processing...",
+        "additionalFields": {}
+      },
+      "name": "Notify: Started",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        832,
+        48
+      ],
+      "id": "08781672-5893-461c-b63d-03439da1e1da",
+      "webhookId": "e8445502-a7f0-4893-9f44-7f1c3bca683e",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y -i /files/input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /files/audio.wav"
+      },
+      "name": "Extract Audio",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        48
+      ],
+      "id": "9a99b40a-3005-4aaf-8aa8-3fdbd4e0f105"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://autosub:5000/transcribe",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input_file",
+              "value": "/files/audio.wav"
+            },
+            {
+              "name": "output_dir",
+              "value": "/files"
+            },
+            {
+              "name": "model",
+              "value": "base"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Generate Subtitles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1216,
+        240
+      ],
+      "id": "5d30cc3f-b841-4357-ab88-f5ba7fb4e030"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "📝 Subtitles generated. Starting translation...",
+        "additionalFields": {}
+      },
+      "name": "Notify: STT Done",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        48
+      ],
+      "id": "f344442e-91b1-4ca2-b5a4-b149f14d0810",
+      "webhookId": "8e757edb-3d2b-4fbe-88f2-5f0f9d88f94d",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "cat /files/audio.srt"
+      },
+      "name": "Read SRT",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        48
+      ],
+      "id": "dbda4f24-3bc6-4773-a8eb-66975e689e64"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  \"model\": \"llama3\",\n  \"prompt\": \"Translate the following SRT subtitles from English to Russian. Preserve the SRT format exactly (timestamps and sequence numbers). Output ONLY the translated SRT content, no introduction or explanation.\\n\\n\" + $('Read SRT').item.json.stdout,\n  \"stream\": false\n}) }}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "name": "Translate (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1808,
+        240
+      ],
+      "id": "d3355c0e-087e-43e5-bb08-e3291aa3f60c"
+    },
+    {
+      "parameters": {
+        "command": "={{ 'echo \"' + $json.response.replace(/\"/g, '\\\"') + '\" > /files/out_ru.srt' }}"
+      },
+      "name": "Save Translated SRT",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        48
+      ],
+      "id": "833bd234-f8d0-4994-85cd-97b0f3890837"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "🇷🇺 Translation complete. Burning subtitles into video...",
+        "additionalFields": {}
+      },
+      "name": "Notify: Trans Done",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        48
+      ],
+      "id": "61d8d0e8-2ffd-493e-a73e-4f5d7ab2e852",
+      "webhookId": "d52b294c-2a85-43c3-b363-1477c85024da",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -y -i /files/input.mp4 -vf \"subtitles=/files/out_ru.srt\" /files/output_ru.mp4"
+      },
+      "name": "Burn Subtitles",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2416,
+        48
+      ],
+      "id": "09cd1b70-bc88-451c-af8a-4e84d89705ad"
+    },
+    {
+      "parameters": {
+        "filePath": "/files/output_ru.mp4"
+      },
+      "name": "Read Output Video",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        48
+      ],
+      "id": "61739155-942f-4b86-83a2-d9186c0ec640"
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "✅ Done! Here is your video with Russian subtitles."
+        }
+      },
+      "name": "Send Video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2816,
+        48
+      ],
+      "id": "310a8046-70fc-48f9-9eff-cbbbc1e75af7",
+      "webhookId": "5e78dd49-43b1-43a2-9c60-f0f7a54954e9",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        2656,
+        336
+      ],
+      "id": "3509c941-604b-48f9-9760-bffb0ef8706c"
+    },
+    {
+      "parameters": {
+        "chatId": "744757325",
+        "text": "={{ '❌ Error occurred' }}",
+        "additionalFields": {}
+      },
+      "name": "Notify: Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        272
+      ],
+      "id": "d8cd558b-a76a-41cb-8669-6925d08b6bb8",
+      "webhookId": "c3feae4c-d293-4964-b5fe-4bb8cf46b1c0",
+      "credentials": {
+        "telegramApi": {
+          "id": "reJpBqrzWct0GecC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "rm -f /files/input.mp4 /files/audio.wav /files/audio.srt /files/out_ru.srt /files/output_ru.mp4"
+      },
+      "name": "Cleanup",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3104,
+        48
+      ],
+      "id": "8a7d141c-c377-4948-ad5a-8728f4a31d14"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Write Input Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Input Video": {
+      "main": [
+        [
+          {
+            "node": "Notify: Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Started": {
+      "main": [
+        [
+          {
+            "node": "Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Audio": {
+      "main": [
+        [
+          {
+            "node": "Generate Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Notify: STT Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: STT Done": {
+      "main": [
+        [
+          {
+            "node": "Read SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read SRT": {
+      "main": [
+        [
+          {
+            "node": "Translate (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translate (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Save Translated SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Translated SRT": {
+      "main": [
+        [
+          {
+            "node": "Notify: Trans Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Trans Done": {
+      "main": [
+        [
+          {
+            "node": "Burn Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Burn Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Read Output Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Output Video": {
+      "main": [
+        [
+          {
+            "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video": {
+      "main": [
+        [
+          {
+            "node": "Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notify: Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Error": {
+      "main": [
+        [
+          {
+            "node": "Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a062e138-d52b-4d67-9ba9-810559ad2cfd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "96df44ab8abeff80f39c0625511b33398693f95832f7a6b411383e54d7083c15"
+  },
+  "id": "lYDgkWL59G7xSdcL",
+  "tags": []
+}
