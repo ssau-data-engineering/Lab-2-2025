@@ -1,12 +1,8 @@
 import requests
 import yt_dlp
-from urllib.parse import urlparse
 from typing import Tuple
 
 def download_video(url: str, output_path: str) -> Tuple[bool, str]:
-    """
-    Скачивание видео по URL
-    """
     try:
         if 'youtube.com' in url or 'youtu.be' in url:
             ydl_opts = {

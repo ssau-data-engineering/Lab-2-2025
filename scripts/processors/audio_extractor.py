@@ -10,11 +10,11 @@ def extract_audio(video_path: str, audio_path: str) -> Tuple[bool, str]:
         cmd = [
             'ffmpeg',
             '-i', video_path,
-            '-vn',  # отключаем видео
+            '-vn',
             '-acodec', 'pcm_s16le',
             '-ar', '16000',
             '-ac', '1',
-            '-y',  # перезаписать
+            '-y', 
             audio_path
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)

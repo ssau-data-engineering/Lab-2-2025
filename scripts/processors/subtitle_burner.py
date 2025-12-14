@@ -3,34 +3,30 @@ import os
 from typing import Tuple
 
 def burn_subtitles(video_path: str, srt_path: str, output_path: str) -> Tuple[bool, str]:
-    """
-    Наложение субтитров на видео
-    """
-    try:
-        filter_complex = (
-            f"subtitles='{srt_path}':force_style="
-            "'FontName=Arial,FontSize=24,PrimaryColour=&HFFFFFF,"
-            "OutlineColour=&H000000,BackColour=&H80000000,BorderStyle=4,"
-            "Outline=2,Shadow=1,MarginV=30'"
-        )
-        cmd = [
-            'ffmpeg',
-            '-i', video_path,
-            '-vf', filter_complex,
-            '-c:a', 'copy',
-            '-c:v', 'libx264',
-            '-preset', 'medium',
-            '-crf', '23',
-            '-y',  # перезаписать
-            output_path
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            return False, f"FFmpeg error: {result.stderr}"
+    if not os.path.exists(srt_path):
+        return False, f"SRT file not found: {srt_path}"
+    if os.path.getsize(srt_path) == 0:
+        return False, "SRT file is empty"
 
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            return True, output_path
-        else:
-            return False, "Output video not created"
+    cmd = [
+        "ffmpeg",
+        "-i", video_path,
+        "-vf", f"subtitles={srt_path}:charenc=UTF-8",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-y",
+        output_path
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            return False, f"FFmpeg failed: {result.stderr}"
+        return True, output_path
+    except subprocess.TimeoutExpired:
+        return False, "FFmpeg timeout (video too long)"
     except Exception as e:
-        return False, str(e)
+        return False, f"Subprocess error: {str(e)}"
